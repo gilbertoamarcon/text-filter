@@ -4,16 +4,17 @@
 import argparse
 import re
 
-PROB = '((?:problem \d+)|(?:problems \d+ and \d+)|(?:problems (?:\d+, )+and \d+))'
-AUTOREF = '(as (?:presented|shown) in .*)'
-GENERAL = '(.*)'
-FMAX = '(\$f_\{max\} = \d\.\d{2}\$)'
-INT = '(\d+)'
+PROB = r'((?:problem \d+)|(?:problems \d+ and \d+)|(?:problems (?:\d+, )+and \d+))'
+PRESENTED = r'(as (?:presented|shown) in .*)'
+AUTOREF = r'(\\autoref\{[^}]+\})'
+GENERAL = r'(.*)'
+FMAX = r'(\$f_\{max\} = \d\.\d{2}\$)'
+INT = r'(\d+)'
 
 
 MIX = {
 	'prob-failed': {
-		'keys': (GENERAL,PROB,AUTOREF),
+		'keys': (GENERAL,PROB,PRESENTED),
 		'templates': [
 			r'%s failed to generate valid plans for %s, %s',
 			r'%s generated no valid plans for %s, %s',
@@ -22,7 +23,7 @@ MIX = {
 		],
 	},
 	'prob-succeeded': {
-		'keys': (GENERAL,PROB,AUTOREF),
+		'keys': (GENERAL,PROB,PRESENTED),
 		'templates': [
 			r'%s solved %s for all coalitions, %s',
 			r'%s generated valid plans for %s for all coalitions, %s',
@@ -30,7 +31,7 @@ MIX = {
 		],
 	},
 	'prob-both': {
-		'keys': (GENERAL,PROB,PROB,AUTOREF),
+		'keys': (GENERAL,PROB,PROB,PRESENTED),
 		'templates': [
 			r'%s did not generate valid plans for %s and solved %s for all coalitions, %s',
 			r'%s failed to generate valid plans for %s and generated valid plans for %s for all coalitions, %s',
@@ -41,7 +42,7 @@ MIX = {
 		],
 	},
 	'succ-count-fail': {
-		'keys': (FMAX,INT,INT,AUTOREF),
+		'keys': (FMAX,INT,INT,PRESENTED),
 		'templates': [
 			r'All %s heuristics failed to produce a valid plan for %s out of the 100 problems, i.e., at least one heuristic succeeded in producing a valid plan for %s out of the 100 problems, %s',
 			r'All %s heuristics failed to generate a valid plan for %s out of the 100 problems, i.e., at least one heuristic succeeded in producing a valid plan for %s out of the 100 problems, %s',
@@ -50,7 +51,7 @@ MIX = {
 		],
 	},
 	'succ-count-succ': {
-		'keys': (FMAX,INT,INT,AUTOREF),
+		'keys': (FMAX,INT,INT,PRESENTED),
 		'templates': [
 			r'All %s heuristics succeeded in generating a valid plan for %s out of the 100 problems, i.e., at least one heuristic failed to produce a valid plan for %s out of the 100 problems, %s',
 			r'All %s heuristics succeeded in producing a valid plan for %s out of the 100 problems, i.e., at least one heuristic failed to produce a valid plan for %s out of the 100 problems, %s',
@@ -60,6 +61,13 @@ MIX = {
 	},
 }
 
+REPT = {
+	'autoref': [
+			r'as presented in',
+			r'as shown in',
+			r'as displayed in',
+		],
+}
 
 
 
@@ -78,8 +86,6 @@ def serial_comma(data):
 		print '\t'+r
 
 def mix(data,base=False):
-	if not base:
-		data = mix(data,base=True)
 	for mode in MIX.values():
 		# for t in mode['templates']:
 		# 	print t%mode['keys']
@@ -90,6 +96,14 @@ def mix(data,base=False):
 			data = data.replace(original,new)
 	return data
 
+def rept(data,base=False):
+	for mode in REPT.values():
+		for t in mode:
+			data = data.replace(t,mode[0])
+		pattern = (r'(?:(?:'+mode[0]+r')((?:(?!'+mode[0]+r')[\S\s])+))')*len(mode)
+		data = re.sub(pattern,''.join('%s\\%d'%(e,i+1) for i,e in enumerate(mode)),data)
+	return data
+
 def filter(filename):
 	print 'File %s:'%filename
 
@@ -97,7 +111,9 @@ def filter(filename):
 		data = f.read()
 		acro_ref(data)
 		serial_comma(data)
+		data = mix(data,base=True)
 		data = mix(data)
+		data = rept(data)
 
 	with open(filename,'w') as f:
 		f.write(data)
