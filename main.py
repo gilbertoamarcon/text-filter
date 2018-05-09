@@ -114,6 +114,7 @@ def filter(filename):
 		data = mix(data,base=True)
 		data = mix(data)
 		data = rept(data)
+		data = re.sub(r'\nthe',r'\nThe',data)
 
 	with open(filename,'w') as f:
 		f.write(data)
